@@ -1,18 +1,5 @@
 #!/usr/bin/env python
 #
-# Copyright 2007 Google Inc.
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
 #
 import webapp2
 import json
@@ -79,14 +66,18 @@ def person_doc(self,counter, body):
         documents_list.extend([my_document])
         self.response.write(len(documents_list))
 def car_doc(self,counter):
-        
+        #body = self.request.body
+        #json_body = json.loads(body)
         latitude = self.request.get('lat')
         
         longitude = self.request.get('lon')
         car_speed = self.request.get('car_speed')
         wiper_speed = self.request.get('wiper_speed')
         car_parked = self.request.get('car_parked')
-        water_level_area = request_body('water_level_area')
+        water_level_area = self.request.get('water_level_area')
+        car_breakdown_area = self.request.get('car_breakdown_area')
+        #self.response.write(float(car_speed)*2)
+        #self.response.write(float(water_level_area)*2)
         my_document = search.Document(
             # Setting the doc_id is optional. If omitted, the search service will create an identifier.
             doc_id = str(counter),
@@ -97,10 +88,11 @@ def car_doc(self,counter):
                 search.NumberField(name='wiper_speed', value=float(wiper_speed)),
                 search.TextField(name='car_parked', value=str(car_parked)),
                 search.NumberField(name='water_level_area', value=int(water_level_area)),
-                search.GeoField(name='wlocation', value=search.GeoPoint(latitude,longitude))                 
+                search.GeoField(name='wlocation', value=search.GeoPoint(float(latitude),float(longitude)))
                 ])
         documents_list.extend([my_document])
-        self.response.write(len(documents_list))
+        s = '%s, %s' % (len(documents_list), counter)
+        self.response.write(s)
 def query_result(self, index, query_string):
     try:
         # val = 2
@@ -165,50 +157,51 @@ class QueryHandler(webapp2.RequestHandler):
             query = search.Query(query_string = query_string)
             query_result(self,index, query)
             #self.response.write('NEAR_BY = %s' % geostring)
-        else:
-            if query_type == "CAR_DATA":
-                query_options = search.QueryOptions(    
-                        returned_fields=['wlocation', 'water_level', 'wiper_speed', 'speed', 'car_break_down','supplier','car_parked'],
-                        )
-                self.response.write('WATER_LEVEL')
-                self.response.write('Query Handler')
-                query_string = "water_level > 1 AND supplier = car"
+        elif query_type == "CAR_DATA":
+         
+            query_options = search.QueryOptions(    
+                    returned_fields=['wlocation', 'water_level', 'wiper_speed', 'speed', 'car_break_down','supplier','car_parked'],
+                    )
+            self.response.write('WATER_LEVEL')
+            self.response.write('Query Handler')
+            query_string = "water_level > 1 AND supplier = car"
+            query = search.Query(query_string = query_string, options = query_options)
+        elif query_type == "HIGH_FLOODING":
+        
+            query_options = search.QueryOptions(    
+                    returned_fields=['wlocation', 'water_level', 'wiper_speed', 'speed', 'car_break_down','supplier','car_parked'],
+                    )
+            self.response.write('WATER_LEVEL')
+            self.response.write('Query Handler')
+            for point_of_interest in high_flooding_areas:
+                latitude = point_of_interest[0]
+                longitude = point_of_interest[1]
+                geostring = "geopoint(%s,%s)" % (latitude,longitude)
+                query_string = "distance(wlocation, %s) < 5000"  % geostring
                 query = search.Query(query_string = query_string, options = query_options)
-        else:
-            if query_type == "HIGH_FLOODING":
-                query_options = search.QueryOptions(    
-                        returned_fields=['wlocation', 'water_level', 'wiper_speed', 'speed', 'car_break_down','supplier','car_parked'],
-                        )
-                self.response.write('WATER_LEVEL')
-                self.response.write('Query Handler')
-                for point_of_interest in high_flooding_areas:
-                    latitude = point_of_interest[0]
-                    longitude = point_of_interest[1]
-                    geostring = "geopoint(%s,%s)" % (latitude,longitude)
-                    query_string = "distance(wlocation, %s) < 5000"  % geostring
-                    query = search.Query(query_string = query_string, options = query_options)
-        else:
-            if query_type == "DIVERSION":
-                query_options = search.QueryOptions(    
-                        returned_fields=['wlocation', 'water_level', 'wiper_speed', 'speed', 'car_break_down','supplier','car_parked'],
-                        )
-                self.response.write('WATER_LEVEL')
-                self.response.write('Query Handler')
-                for point_of_interest in diversion_areas:
-                    latitude = point_of_interest[0]
-                    longitude = point_of_interest[1]
-                    geostring = "geopoint(%s,%s)" % (latitude,longitude)
-                    query_string = "distance(wlocation, %s) < 5000"  % geostring
-                    query = search.Query(query_string = query_string, options = query_options)
+        elif query_type == "DIVERSION":
+             
+            query_options = search.QueryOptions(    
+                    returned_fields=['wlocation', 'water_level', 'wiper_speed', 'speed', 'car_break_down','supplier','car_parked'],
+                    )
+            self.response.write('WATER_LEVEL')
+            self.response.write('Query Handler')
+            for point_of_interest in diversion_areas:
+                latitude = point_of_interest[0]
+                longitude = point_of_interest[1]
+                geostring = "geopoint(%s,%s)" % (latitude,longitude)
+                query_string = "distance(wlocation, %s) < 5000"  % geostring
+                query = search.Query(query_string = query_string, options = query_options)
 class PersonMonsoonHandler(webapp2.RequestHandler):  
     def post(self):
         global documents_counter
         global total_docs_counter
+        global documents_list
         documents_counter+=1   	
         total_docs_counter+=1
         request_body = self.request.body
 
-    	person_doc(self, documents_counter, request_body)
+    	person_doc(self, total_docs_counter, request_body)
         if documents_counter >= 1:
             try:
                 documents_counter = 0
@@ -225,10 +218,11 @@ class CarMonsoonDataHandler(webapp2.RequestHandler):
     def post(self):
         global documents_counter
         global total_docs_counter
+        global documents_list
         documents_counter+=1    
         total_docs_counter+=1
-        car_doc(self, documents_counter)
-        if documents_counter >= 1:
+        car_doc(self, total_docs_counter)
+        if documents_counter >= 20:
             try:
                 documents_counter = 0
                 index = search.Index(name="crowdsourced_mumbai_monsoon")
